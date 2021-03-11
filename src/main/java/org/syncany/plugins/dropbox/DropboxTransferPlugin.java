@@ -27,11 +27,11 @@ import com.dropbox.core.DbxRequestConfig;
  * @author Christian Roth <christian.roth@port17.de>
  */
 public class DropboxTransferPlugin extends TransferPlugin {
-	private static final String APP_KEY = "dlg8wdfpf3xa5jv";
-	private static final String APP_SECRET = "ya9t3c6xk9o3ndg";
+	private static final String APP_KEY = "Your APP_KEY";
+	private static final String APP_SECRET = "Your APP_SECRET";
 
 	public static final DbxAppInfo DROPBOX_APP_INFO = new DbxAppInfo(APP_KEY, APP_SECRET);
-	public static final DbxRequestConfig DROPBOX_REQ_CONFIG = new DbxRequestConfig("syncany", Locale.ENGLISH.toString());
+	public static final DbxRequestConfig DROPBOX_REQ_CONFIG = DbxRequestConfig.newBuilder("syncany").build();
 
 	public DropboxTransferPlugin() {
 		super("dropbox");

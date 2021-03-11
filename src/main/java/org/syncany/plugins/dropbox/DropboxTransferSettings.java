@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.dropbox.core.DbxAuthFinish;
 import org.simpleframework.xml.Element;
 import org.syncany.plugins.dropbox.DropboxTransferSettings.DropboxOAuthGenerator;
 import org.syncany.plugins.transfer.Encrypted;
@@ -31,10 +32,9 @@ import org.syncany.plugins.transfer.StorageException;
 import org.syncany.plugins.transfer.TransferSettings;
 import org.syncany.plugins.transfer.oauth.OAuth;
 import org.syncany.plugins.transfer.oauth.OAuthGenerator;
-import com.dropbox.core.DbxClient;
+import com.dropbox.core.v2.DbxClientV2;
 import com.dropbox.core.DbxSessionStore;
 import com.dropbox.core.DbxWebAuth;
-import com.dropbox.core.DbxWebAuthNoRedirect;
 import com.google.common.collect.Maps;
 
 /**
@@ -45,7 +45,8 @@ public class DropboxTransferSettings extends TransferSettings {
 	private static final Logger logger = Logger.getLogger(DropboxTransferSettings.class.getName());
 
 	private DbxWebAuth webAuth;
-	private DbxWebAuthNoRedirect webAuthNoRedirect;
+	private DbxWebAuth webAuthNoRedirect;
+	private DbxSessionStore csrfTokenStore;
 
 	@Element(name = "accessToken", required = true)
 	@Setup(order = 1, visible = false)
@@ -69,7 +70,7 @@ public class DropboxTransferSettings extends TransferSettings {
 		public URI generateAuthUrl(URI redirectUri) throws StorageException {
 			logger.log(Level.INFO, "Operation mode is redirect_url");
 
-			DbxSessionStore csrfTokenStore = new DbxSessionStore() {
+			csrfTokenStore = new DbxSessionStore() {
 				private String token;
 
 				@Override
@@ -88,10 +89,13 @@ public class DropboxTransferSettings extends TransferSettings {
 				}
 			};
 
-			webAuth = new DbxWebAuth(DropboxTransferPlugin.DROPBOX_REQ_CONFIG, DropboxTransferPlugin.DROPBOX_APP_INFO, redirectUri.toString(), csrfTokenStore);
+			webAuth = new DbxWebAuth(DropboxTransferPlugin.DROPBOX_REQ_CONFIG, DropboxTransferPlugin.DROPBOX_APP_INFO);
+			DbxWebAuth.Request authRequest = DbxWebAuth.newRequestBuilder()
+					.withRedirectUri(redirectUri.toString(), csrfTokenStore)
+					.build();
 
 			try {
-				return new URI(webAuth.start());
+				return new URI(webAuth.authorize(authRequest));
 			}
 			catch (URISyntaxException e) {
 				throw new StorageException(e);
@@ -102,10 +106,12 @@ public class DropboxTransferSettings extends TransferSettings {
 		public URI generateAuthUrl() throws StorageException {
 			logger.log(Level.INFO, "Operation mode is no_redirect_uri");
 
-			webAuthNoRedirect = new DbxWebAuthNoRedirect(DropboxTransferPlugin.DROPBOX_REQ_CONFIG, DropboxTransferPlugin.DROPBOX_APP_INFO);
+			webAuthNoRedirect = new DbxWebAuth(DropboxTransferPlugin.DROPBOX_REQ_CONFIG,DropboxTransferPlugin.DROPBOX_APP_INFO);
+			DbxWebAuth.Request authRequest = DbxWebAuth.newRequestBuilder()
+					.withNoRedirect().build();
 
 			try {
-				return new URI(webAuth.start());
+				return new URI(webAuthNoRedirect.authorize(authRequest));
 			}
 			catch (URISyntaxException e) {
 				throw new StorageException(e);
@@ -114,6 +120,8 @@ public class DropboxTransferSettings extends TransferSettings {
 
 		@Override
 		public void checkToken(String code, String csrfState) throws StorageException {
+			DbxAuthFinish authFinish;
+
 			try {
 				if (webAuth != null) {
 					logger.log(Level.INFO, "Extracting token from redirect_url");
@@ -122,16 +130,19 @@ public class DropboxTransferSettings extends TransferSettings {
 					responseMap.put("code", new String[]{code});
 					responseMap.put("state", new String[]{csrfState});
 
-					accessToken = webAuth.finish(responseMap).accessToken;
+					authFinish = webAuth.finishFromRedirect("http://localhost:6462/dropbox/",csrfTokenStore,responseMap);
+					accessToken = authFinish.getAccessToken();
+
 				}
 				else if (webAuthNoRedirect != null) {
 					logger.log(Level.INFO, "Extracting token from copy-paste code");
-					accessToken = webAuthNoRedirect.finish(code).accessToken;
+					authFinish = webAuthNoRedirect.finishFromCode(code);
+					accessToken = authFinish.getAccessToken();
 				}
 
-				DbxClient client = new DbxClient(DropboxTransferPlugin.DROPBOX_REQ_CONFIG, accessToken);
+				DbxClientV2 client = new DbxClientV2(DropboxTransferPlugin.DROPBOX_REQ_CONFIG, accessToken);
 
-				client.getAccountInfo(); // Throws exception if this fails!
+				client.users().getCurrentAccount(); // Throws exception if this fails!
 			}
 			catch (Exception e) {
 				throw new RuntimeException("Error requesting dropbox data: " + e.getMessage());

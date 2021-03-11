@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.dropbox.core.InvalidAccessTokenException;
+import com.dropbox.core.v2.files.*;
 import org.apache.commons.io.FileUtils;
 import org.syncany.config.Config;
 import org.syncany.plugins.transfer.AbstractTransferManager;
@@ -50,11 +52,8 @@ import org.syncany.plugins.transfer.files.TempRemoteFile;
 import org.syncany.plugins.transfer.files.TransactionRemoteFile;
 import org.syncany.util.FileUtil;
 
-import com.dropbox.core.DbxClient;
-import com.dropbox.core.DbxEntry;
+import com.dropbox.core.v2.DbxClientV2;
 import com.dropbox.core.DbxException;
-import com.dropbox.core.DbxException.BadResponseCode;
-import com.dropbox.core.DbxWriteMode;
 import com.google.common.collect.Maps;
 
 /**
@@ -80,7 +79,7 @@ import com.google.common.collect.Maps;
 public class DropboxTransferManager extends AbstractTransferManager {
 	private static final Logger logger = Logger.getLogger(DropboxTransferManager.class.getSimpleName());
 
-	private final DbxClient client;
+	private final DbxClientV2 client;
 	private final URI path;
 	private final URI multichunksPath;
 	private final URI databasesPath;
@@ -98,16 +97,16 @@ public class DropboxTransferManager extends AbstractTransferManager {
 		this.transactionsPath = UriBuilder.fromRoot("/").toChild(settings.getPath()).toChild("transactions").build();
 		this.tempPath = UriBuilder.fromRoot("/").toChild(settings.getPath()).toChild("temporary").build();
 
-		this.client = new DbxClient(DropboxTransferPlugin.DROPBOX_REQ_CONFIG, settings.getAccessToken());
+		this.client = new DbxClientV2(DropboxTransferPlugin.DROPBOX_REQ_CONFIG, settings.getAccessToken());
 	}
 
 	@Override
 	public void connect() throws StorageException {
 		// make a connect
 		try {
-			logger.log(Level.INFO, "Using dropbox account from {0}", new Object[]{client.getAccountInfo().displayName});
+			logger.log(Level.INFO, "Using dropbox account from {0}", new Object[]{client.users().getCurrentAccount().getName()});
 		}
-		catch (DbxException.InvalidAccessToken e) {
+		catch (InvalidAccessTokenException e) {
 			throw new StorageException("The accessToken in use is invalid", e);
 		}
 		catch (Exception e) {
@@ -126,14 +125,14 @@ public class DropboxTransferManager extends AbstractTransferManager {
 
 		try {
 			if (!testTargetExists() && createIfRequired) {
-				client.createFolder(path.toString());
+				client.files().createFolderV2(path.toString());
 			}
 
-			client.createFolder(multichunksPath.toString());
-			client.createFolder(databasesPath.toString());
-			client.createFolder(actionsPath.toString());
-			client.createFolder(transactionsPath.toString());
-			client.createFolder(tempPath.toString());
+			client.files().createFolderV2(multichunksPath.toString());
+			client.files().createFolderV2(databasesPath.toString());
+			client.files().createFolderV2(actionsPath.toString());
+			client.files().createFolderV2(transactionsPath.toString());
+			client.files().createFolderV2(tempPath.toString());
 		}
 		catch (DbxException e) {
 			throw new StorageException("init: Cannot create required directories", e);
@@ -157,7 +156,7 @@ public class DropboxTransferManager extends AbstractTransferManager {
 					logger.log(Level.INFO, "Dropbox: Downloading {0} to temp file {1}", new Object[]{remotePath, tempFile});
 				}
 
-				client.getFile(remotePath, null, tempFOS);
+				client.files().downloadBuilder(remotePath).download(tempFOS);
 
 				tempFOS.close();
 
@@ -190,7 +189,8 @@ public class DropboxTransferManager extends AbstractTransferManager {
 				logger.log(Level.INFO, "Dropbox: Uploading {0} to temp file {1}", new Object[]{localFile, tempRemotePath});
 			}
 
-			client.uploadFile(tempRemotePath, DbxWriteMode.add(), localFile.length(), fileFIS);
+			//client.uploadFile(tempRemotePath, DbxWriteMode.add(), localFile.length(), fileFIS);
+			client.files().uploadBuilder(tempRemotePath).withMode(WriteMode.ADD).uploadAndFinish(fileFIS);
 
 			fileFIS.close();
 
@@ -199,7 +199,7 @@ public class DropboxTransferManager extends AbstractTransferManager {
 				logger.log(Level.INFO, "Dropbox: Renaming temp file {0} to file {1}", new Object[]{tempRemotePath, remotePath});
 			}
 
-			client.move(tempRemotePath, remotePath);
+			client.files().moveV2(tempRemotePath,remotePath);
 		}
 		catch (DbxException | IOException ex) {
 			logger.log(Level.SEVERE, "Could not upload file " + localFile + " to " + remoteFile.getName(), ex);
@@ -212,11 +212,11 @@ public class DropboxTransferManager extends AbstractTransferManager {
 		String remotePath = getRemoteFile(remoteFile);
 
 		try {
-			client.delete(remotePath);
+			client.files().deleteV2(remotePath);
 			return true;
 		}
-		catch (BadResponseCode e) {
-			if (e.statusCode == 404) {
+		catch (DeleteErrorException e) {
+			if (e.errorValue.isPathLookup() && e.errorValue.getPathLookupValue().isNotFound()) {
 				logger.log(Level.INFO, "File does not exist. Doing nothing: " + remoteFile.getName(), e);
 				return true;
 			}
@@ -237,7 +237,7 @@ public class DropboxTransferManager extends AbstractTransferManager {
 		String targetRemotePath = getRemoteFile(targetFile);
 
 		try {
-			client.move(sourceRemotePath, targetRemotePath);
+			client.files().moveV2(sourceRemotePath, targetRemotePath);
 		}
 		catch (DbxException e) {
 			logger.log(Level.SEVERE, "Could not rename file " + sourceRemotePath + " to " + targetRemotePath, e);
@@ -299,8 +299,8 @@ public class DropboxTransferManager extends AbstractTransferManager {
 				String tempRemoteFile = path + "/syncany-write-test";
 				File tempFile = File.createTempFile("syncany-write-test", "tmp");
 
-				client.uploadFile(tempRemoteFile, DbxWriteMode.add(), 0, new ByteArrayInputStream(new byte[0]));
-				client.delete(tempRemoteFile);
+				client.files().uploadBuilder(tempRemoteFile).withMode(WriteMode.ADD).uploadAndFinish(new ByteArrayInputStream(new byte[0]));
+				client.files().deleteV2(tempRemoteFile);
 
 				tempFile.delete();
 
@@ -321,9 +321,9 @@ public class DropboxTransferManager extends AbstractTransferManager {
 	@Override
 	public boolean testTargetExists() {
 		try {
-			DbxEntry metadata = client.getMetadata(path.toString());
+			Metadata metadata = client.files().getMetadata(path.toString());
 
-			if (metadata != null && metadata.isFolder()) {
+			if (metadata != null && metadata instanceof FolderMetadata) {
 				logger.log(Level.INFO, "testTargetExists: Target does exist.");
 				return true;
 			}
@@ -347,10 +347,10 @@ public class DropboxTransferManager extends AbstractTransferManager {
 
 		// Test parent path permissions
 		try {
-			DbxEntry metadata = client.getMetadata(parentPath);
+			Metadata metadata = client.files().getMetadata(parentPath);
 
 			// our app has read/write for EVERY folder inside a dropbox. as long as it exists, we can write in it
-			if (metadata.isFolder()) {
+			if (metadata instanceof FolderMetadata) {
 				logger.log(Level.INFO, "testTargetCanCreate: Can create target at " + parentPath);
 				return true;
 			}
@@ -370,9 +370,9 @@ public class DropboxTransferManager extends AbstractTransferManager {
 	public boolean testRepoFileExists() {
 		try {
 			String repoFilePath = getRemoteFile(new SyncanyRemoteFile());
-			DbxEntry metadata = client.getMetadata(repoFilePath);
+			Metadata metadata = client.files().getMetadata(repoFilePath);
 
-			if (metadata != null && metadata.isFile()) {
+			if (metadata != null && metadata instanceof FileMetadata) {
 				logger.log(Level.INFO, "testRepoFileExists: Repo file exists at " + repoFilePath);
 				return true;
 			}
@@ -405,7 +405,7 @@ public class DropboxTransferManager extends AbstractTransferManager {
 			logger.log(Level.FINE, "Deleting folder " + path);
 
 			try {
-				transferManager.client.delete(path);
+				transferManager.client.files().deleteV2(path);
 				return true;
 			}
 			catch (DbxException e) {
@@ -422,20 +422,27 @@ public class DropboxTransferManager extends AbstractTransferManager {
 			Map<String, FileType> contents = Maps.newHashMap();
 
 			try {
-				DbxEntry.WithChildren listing = transferManager.client.getMetadataWithChildren(path);
-				if (listing == null || listing.children == null) {
+				Boolean hasMore = true;
+				ListFolderResult flisting = transferManager.client.files().listFolder(path);
+				if (flisting.getEntries().isEmpty()) {
 					return contents;
 				}
 
-				for (DbxEntry child : listing.children) {
-					if (child.isFile()) {
-						contents.put(child.name, FileType.FILE);
-					}
-					else if (child.isFolder()) {
-						contents.put(child.name, FileType.FOLDER);
+				while (hasMore) {
+					for (Metadata fchild : flisting.getEntries()) {
+						if (fchild instanceof FileMetadata) {
+							contents.put(fchild.getName(), FileType.FILE);
+							}
+						else if (fchild instanceof FolderMetadata) {
+							contents.put(fchild.getName(), FileType.FOLDER);
+							}
+						}
+					hasMore = flisting.getHasMore();
+					if (hasMore) {
+						flisting = transferManager.client.files().listFolderContinue(flisting.getCursor());
+						}
 					}
 				}
-			}
 			catch (DbxException e) {
 				logger.log(Level.SEVERE, "Unable to list folder", e);
 				throw new StorageException("Unable to list folder", e);
