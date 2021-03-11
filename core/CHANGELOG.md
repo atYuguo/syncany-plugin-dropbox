@@ -1,6 +1,44 @@
 Change Log
 ==========
 
+### Syncany 0.4.10-alpha (Date: TBA)
+- Developer/alpha/maintanance release 
+- Bugfixes and other things:
+  + Fixed small bug with windows paths #598/#599
+
+### Syncany 0.4.9-alpha (Date: 16 Jan 2017)
+- Developer/alpha/maintanance release 
+- Bugfixes and other things:
+  + Fixed bug with `sy restore` #534/#535
+  + Fix .syignore recursive behavior #555/#544
+  + Fixed crictical bug preventing functioning with newer JVM #595/#596/#597
+ 
+### Syncany 0.4.7-alpha (Date: 7 Nov 2015)
+- Developer/alpha release (**We are now nearing the beta phase. Stay tuned!**)
+- Bugfixes and other things:
+  + Refactoring and simplification of UpOperation
+  + Refactoring DownOperation (better memory management)
+  + Refactoring of error handling (don't throw 'Exception')
+  + Fix GUI crashes in 'Add folder' wizard #497
+  + Fix OSX daemon start/stop to new style #281/#530
+  + Fix Windows spaces in path issue #522/#529
+  + Fix not resuming transactions if transaction files are corrupt #520
+
+### Syncany 0.4.6-alpha (Date: 11 July 2015)
+- Developer/alpha release (**We are now nearing the beta phase. Stay tuned!**)
+- Features and significant changes:
+  + Use smaller transactions in Up #364
+  + Add 'Use short links' option to GUI
+- Bugfixes and other things:
+  + Update licensing to match GPLv3+ #457
+  + Prepare fix for read-after-write issue with S3 and Swift plugin #456
+  + Fix S3 read-after-write consistent issue #448
+  + Change default crypto to just AES-128/GCM
+  + Fix table creation process to not throw an error
+  + Fix swift read after write consistent issue #276
+  + Create target in `sy init` by default (disable with -T)
+  + Fix API to support ARM for platform-independent plugins #495
+
 ### Syncany 0.4.5-alpha (Date: 8 May 2015)
 - Developer/alpha release (**We are now nearing the beta phase. Stay tuned!**)
 - Features and significant changes:

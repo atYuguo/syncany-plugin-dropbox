@@ -1,6 +1,6 @@
 /*
  * Syncany, www.syncany.org
- * Copyright (C) 2011-2015 Philipp C. Heckel <philipp.heckel@gmail.com>
+ * Copyright (C) 2011-2016 Philipp C. Heckel <philipp.heckel@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,11 +27,12 @@ import org.syncany.config.Config;
 import org.syncany.config.LocalEventBus;
 import org.syncany.plugins.transfer.StorageException;
 import org.syncany.plugins.transfer.TransferManager;
+import org.syncany.plugins.transfer.TransferManagerFactory;
+import org.syncany.plugins.transfer.features.ReadAfterWriteConsistent;
 import org.syncany.plugins.transfer.features.PathAware;
 import org.syncany.plugins.transfer.features.Retriable;
 import org.syncany.plugins.transfer.features.TransactionAware;
 import org.syncany.plugins.transfer.features.TransactionAwareFeatureTransferManager;
-import org.syncany.plugins.transfer.TransferManagerFactory;
 import org.syncany.plugins.transfer.files.ActionRemoteFile;
 import org.syncany.plugins.transfer.files.CleanupRemoteFile;
 import org.syncany.plugins.transfer.files.DatabaseRemoteFile;
@@ -44,7 +45,7 @@ import org.syncany.plugins.transfer.files.DatabaseRemoteFile;
  * <p>This abstract class offers convenience methods to handle {@link ActionRemoteFile} as well
  * as to handle the connection and local cache.
  *
- * @author Philipp C. Heckel <philipp.heckel@gmail.com>
+ * @author Philipp C. Heckel (philipp.heckel@gmail.com)
  */
 public abstract class AbstractTransferOperation extends Operation {
 	private static final Logger logger = Logger.getLogger(AbstractTransferOperation.class.getSimpleName());
@@ -73,16 +74,18 @@ public abstract class AbstractTransferOperation extends Operation {
 
 			TransferManager actionFileTransferManager = TransferManagerFactory
 					.build(config)
+					.withFeature(ReadAfterWriteConsistent.class)
 					.withFeature(Retriable.class)
 					.asDefault();
-			
+
 			TransactionAwareFeatureTransferManager regularFileTransferManager = TransferManagerFactory
 					.build(config)
+					.withFeature(ReadAfterWriteConsistent.class)
 					.withFeature(Retriable.class)
 					.withFeature(PathAware.class)
 					.withFeature(TransactionAware.class)
 					.as(TransactionAware.class);
-			
+
 			this.actionHandler = new ActionFileHandler(actionFileTransferManager, operationName, config.getMachineName());
 			this.transferManager = regularFileTransferManager;
 		}

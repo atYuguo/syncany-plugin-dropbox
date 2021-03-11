@@ -1,6 +1,6 @@
 /*
  * Syncany, www.syncany.org
- * Copyright (C) 2011-2015 Philipp C. Heckel <philipp.heckel@gmail.com>
+ * Copyright (C) 2011-2016 Philipp C. Heckel <philipp.heckel@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -45,10 +45,10 @@ import org.syncany.util.StringUtil;
  * used in the operations, but parts of it are also used in other parts of the
  * application -- especially file locations and names.
  *
- * <p>An instance of the <tt>Config</tt> class must be created through the transfer
+ * <p>An instance of the <code>Config</code> class must be created through the transfer
  * objects {@link ConfigTO} and {@link RepoTO}.
  *
- * @author Philipp C. Heckel <philipp.heckel@gmail.com>
+ * @author Philipp C. Heckel (philipp.heckel@gmail.com)
  */
 public class Config {
 	public static final String DIR_APPLICATION = ".syncany";
@@ -72,6 +72,9 @@ public class Config {
 	public static final String FILE_PORT = "port.xml";
 	public static final String FILE_TRANSACTION = "transaction-actions.xml";
 	public static final String FILE_TRANSACTION_DATABASE = "transaction-database.xml";
+	public static final String FILE_TRANSACTION_PATTERN = "transaction-actions.%010d.xml";
+	public static final String FILE_TRANSACTION_DATABASE_PATTERN = "transaction-database.%010d.xml";
+	public static final String FILE_TRANSACTION_LIST = "transaction-list.txt";
 
 	private byte[] repoId;
 	private String machineName;
@@ -234,7 +237,11 @@ public class Config {
 	}
 
 	public java.sql.Connection createDatabaseConnection() {
-		return DatabaseConnectionFactory.createConnection(getDatabaseFile());
+		return DatabaseConnectionFactory.createConnection(getDatabaseFile(), false);
+	}
+
+	public java.sql.Connection createDatabaseConnection(boolean readOnly) {
+		return DatabaseConnectionFactory.createConnection(getDatabaseFile(), readOnly);
 	}
 
 	public File getCacheDir() {
@@ -339,5 +346,17 @@ public class Config {
 
 	public File getTransactionDatabaseFile() {
 		return new File(stateDir, FILE_TRANSACTION_DATABASE);
+	}
+
+	public File getTransactionListFile() {
+		return new File(stateDir, FILE_TRANSACTION_LIST);
+	}
+
+	public File getTransactionFile(long databaseVersionNumber) {
+		return new File(stateDir, String.format(FILE_TRANSACTION_PATTERN, databaseVersionNumber));
+	}
+
+	public File getTransactionDatabaseFile(long databaseVersionNumber) {
+		return new File(stateDir, String.format(FILE_TRANSACTION_DATABASE_PATTERN, databaseVersionNumber));
 	}
 }

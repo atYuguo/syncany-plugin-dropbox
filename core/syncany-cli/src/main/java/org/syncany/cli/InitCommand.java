@@ -1,6 +1,6 @@
 /*
  * Syncany, www.syncany.org
- * Copyright (C) 2011-2015 Philipp C. Heckel <philipp.heckel@gmail.com>
+ * Copyright (C) 2011-2016 Philipp C. Heckel <philipp.heckel@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -87,7 +87,7 @@ public class InitCommand extends AbstractInitCommand {
 		InitOperationOptions operationOptions = new InitOperationOptions();
 
 		OptionParser parser = new OptionParser();
-		OptionSpec<Void> optionCreateTargetPath = parser.acceptsAll(asList("t", "create-target"));
+		OptionSpec<Void> optionNoCreateTarget = parser.acceptsAll(asList("T", "no-create-target"));
 		OptionSpec<Void> optionAdvanced = parser.acceptsAll(asList("a", "advanced"));
 		OptionSpec<Void> optionNoCompression = parser.acceptsAll(asList("G", "no-compression"));
 		OptionSpec<Void> optionNoEncryption = parser.acceptsAll(asList("E", "no-encryption"));
@@ -110,7 +110,7 @@ public class InitCommand extends AbstractInitCommand {
 		TransferSettings transferSettings = createTransferSettingsFromOptions(options, optionPlugin, optionPluginOpts);
 
 		// Some misc settings
-		boolean createTargetPath = options.has(optionCreateTargetPath);
+		boolean createTargetPath = !options.has(optionNoCreateTarget);
 		boolean advancedModeEnabled = options.has(optionAdvanced);
 		boolean encryptionEnabled = !options.has(optionNoEncryption);
 		boolean compressionEnabled = !options.has(optionNoCompression);
